@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan'); // ✅ agregar
 
 const app = express();
 
@@ -17,7 +18,14 @@ const adminRoutes = require('./routes/admin.routes');
 
 // Middlewares
 app.use(cors());
+app.use(morgan('dev')); // ✅ logging como en la guía
 app.use(express.json());
+
+// Middleware personalizado (como te enseñaron)
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Health
 app.get('/api/health', (req, res) => {
@@ -39,6 +47,15 @@ app.use('/api/admin', adminRoutes);
 // 404
 app.use((req, res) => {
   res.status(404).json({ ok: false, msg: 'Ruta no encontrada' });
+});
+
+// ✅ Middleware de errores global (FALTABA)
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({
+    ok: false,
+    msg: 'Error interno del servidor'
+  });
 });
 
 module.exports = app;
