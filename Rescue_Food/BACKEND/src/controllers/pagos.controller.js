@@ -6,6 +6,7 @@ const createPago = async (req, res) => {
   try {
     const { pedido_id, metodo_pago, referencia } = req.body; // datos body
 
+    // Validación: Verifica que el identificador del pedido y el método de pago no estén vacíos
     if (!pedido_id || !metodo_pago) {
       return res.status(400).json({
         ok: false,
@@ -14,6 +15,8 @@ const createPago = async (req, res) => {
     }
 
     const pedido = await PagoModel.getPedidoById(pedido_id); // busca pedido
+    
+    // Validación: Comprueba la existencia real del pedido antes de intentar procesar el pago
     if (!pedido) {
       return res.status(404).json({
         ok: false,
@@ -22,6 +25,8 @@ const createPago = async (req, res) => {
     }
 
     const pagoExistente = await PagoModel.getPagoByPedido(pedido_id); // valida si ya pagó
+    
+    // Validación de duplicidad: Evita registrar múltiples transacciones para un mismo pedido
     if (pagoExistente) {
       return res.status(409).json({
         ok: false,
@@ -29,6 +34,7 @@ const createPago = async (req, res) => {
       });
     }
 
+    // Registra la nueva transacción inyectando el total del pedido de forma automática
     const pagoId = await PagoModel.createPago({
       pedido_id,
       metodo_pago,
@@ -41,6 +47,7 @@ const createPago = async (req, res) => {
 
     const pago = await PagoModel.getPagoByPedido(pedido_id); // trae pago
 
+    // Retorna éxito con los datos del pago o un respaldo con el ID generado mediante cortocircuito
     return res.status(201).json({
       ok: true,
       msg: 'Pago registrado correctamente',
@@ -57,6 +64,8 @@ const getPagoByPedido = async (req, res) => {
     const { pedidoId } = req.params; // id pedido
 
     const pago = await PagoModel.getPagoByPedido(pedidoId); // consulta DB
+    
+    // Validación: Corta el flujo si la base de datos no arroja registros de pago para ese pedido
     if (!pago) {
       return res.status(404).json({
         ok: false,

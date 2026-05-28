@@ -1,5 +1,5 @@
 // Importa conexión a MySQL
-const { pool } = require('../config/db');
+const { pool } = require('../config/db'); // Importa el pool de conexiones configurado para interactuar con MySQL
 
 // Obtener todos los usuarios
 const getUsuarios = async () => {
@@ -7,7 +7,7 @@ const getUsuarios = async () => {
     SELECT *
     FROM usuarios
     ORDER BY id DESC
-  `); // consulta DB
+  `); // Ejecuta la consulta SQL y aplica destructuración para obtener solo las filas con los registros
   return rows; // devuelve datos
 };
 
@@ -17,25 +17,25 @@ const getPedidos = async () => {
     SELECT *
     FROM pedidos
     ORDER BY id DESC
-  `); // consulta DB
+  `); // Consulta la tabla de pedidos organizando los más recientes primero (DESC)
   return rows; // devuelve datos
 };
 
 // Obtener métricas (totales)
 const getMetricas = async () => {
-  const [[usuarios]] = await pool.query(`SELECT COUNT(*) AS total FROM usuarios`); // total usuarios
-  const [[pedidos]] = await pool.query(`SELECT COUNT(*) AS total FROM pedidos`); // total pedidos
+  const [[usuarios]] = await pool.query(`SELECT COUNT(*) AS total FROM usuarios`); // Doble destructuración para extraer directamente el objeto de la primera fila
+  const [[pedidos]] = await pool.query(`SELECT COUNT(*) AS total FROM pedidos`); // Cuenta la cantidad total de pedidos registrados en el sistema
   const [[ventas]] = await pool.query(`
     SELECT COALESCE(SUM(total), 0) AS total 
     FROM pedidos 
     WHERE estado = 'pagado'
-  `); // total ventas
+  `); // Suma los ingresos usando COALESCE para que devuelva 0 en lugar de NULL si no hay ventas realizadas
 
   return {
     usuarios: usuarios.total,
     pedidos: pedidos.total,
     ventas: ventas.total
-  }; // devuelve métricas
+  }; // Retorna un objeto unificado con las tres estadísticas clave para el dashboard de administración
 };
 
 // Exporta funciones

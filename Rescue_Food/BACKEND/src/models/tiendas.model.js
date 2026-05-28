@@ -1,8 +1,7 @@
-// Importa conexión DB
 const { pool } = require('../config/db');
 
-// Obtener tienda por usuario
-const getByUsuarioId = async (usuarioId) => {
+// Obtener tienda por usuario_id
+const getByUsuarioId = async (usuario_id) => {
   const [rows] = await pool.query(
     `SELECT
         t.id,
@@ -19,37 +18,36 @@ const getByUsuarioId = async (usuarioId) => {
      FROM tiendas t
      INNER JOIN usuarios u ON u.id = t.usuario_id
      WHERE t.usuario_id = ?`,
-    [usuarioId]
-  ); // consulta tienda
-
-  return rows[0]; // devuelve una
-};
-
-// Validar email en otro usuario
-const emailExistsInAnotherUser = async (email, usuarioId) => {
-  const [rows] = await pool.query(
-    `SELECT id FROM usuarios WHERE email = ? AND id <> ?`,
-    [email, usuarioId]
-  ); // busca email repetido
-
+    [usuario_id]
+  ); // Cruza la tabla de tiendas con usuarios (INNER JOIN) para unificar los datos personales y del local comercial
   return rows[0];
 };
 
-// Actualizar tienda por usuario
-const updateByUsuarioId = async (usuarioId, data) => {
-  const connection = await pool.getConnection(); // toma conexión
+// Validar email repetido omitiendo al usuario actual
+const emailExistsInAnotherUser = async (email, usuario_id) => {
+  const [rows] = await pool.query(
+    `SELECT id FROM usuarios WHERE email = ? AND id <> ?`,
+    [email, usuario_id]
+  ); // Usa el operador de diferencia (<>) para verificar si el correo ya le pertenece a OTRAS cuentas
+  return rows[0];
+};
 
+// Actualizar transaccional
+const updateByUsuarioId = async (usuario_id, data) => {
+  const connection = await pool.getConnection(); // Solicita una conexión dedicada del pool para manejar de forma segura la transacción
   try {
-    await connection.beginTransaction(); // inicia transacción
+    await connection.beginTransaction(); // Inicia la transacción para asegurar que ambas tablas se actualicen juntas con éxito
 
+    // Actualizar tabla usuarios
     await connection.query(
       `UPDATE usuarios
        SET nombre = COALESCE(?, nombre),
            email = COALESCE(?, email)
        WHERE id = ?`,
-      [data.nombre ?? null, data.email ?? null, usuarioId]
-    ); // actualiza usuario
+      [data.nombre ?? null, data.email ?? null, usuario_id]
+    ); // Modifica los datos de autenticación del usuario usando COALESCE para omitir valores vacíos
 
+    // Actualizar tabla tiendas
     const [result] = await connection.query(
       `UPDATE tiendas
        SET nombre_tienda = COALESCE(?, nombre_tienda),
@@ -64,21 +62,20 @@ const updateByUsuarioId = async (usuarioId, data) => {
         data.direccion ?? null,
         data.horario ?? null,
         data.logo_url ?? null,
-        usuarioId
+        usuario_id
       ]
-    ); // actualiza tienda
+    ); // Modifica de forma paralela la información comercial enlazada a ese mismo usuario
 
-    await connection.commit(); // guarda cambios
+    await connection.commit(); // Si ninguna consulta falló, aplica y guarda de manera permanente todos los cambios en la BD
     return result.affectedRows;
   } catch (error) {
-    await connection.rollback(); // revierte si falla
+    await connection.rollback(); // En caso de cualquier error intermedio, cancela todo y restaura el estado original
     throw error;
   } finally {
-    connection.release(); // libera conexión
+    connection.release(); // Libera la conexión devolviéndola al pool para que quede disponible en el sistema
   }
 };
 
-// Exporta funciones
 module.exports = {
   getByUsuarioId,
   emailExistsInAnotherUser,

@@ -1,28 +1,13 @@
-// Importa librerías
-const jwt = require('jsonwebtoken');
+// src/controllers/auth.controller.js
+
 const bcrypt = require('bcryptjs');
-
-// Importa modelo de auth
+const jwt = require('jsonwebtoken');
 const AuthModel = require('../models/auth.model');
+const UsuarioModel = require('../models/usuarios.model'); // Importación necesaria para alterar credenciales
 
-// Generar token JWT
-const generarToken = (usuario) => {
-  return jwt.sign(
-    {
-      id: usuario.id,
-      email: usuario.email,
-      rol: usuario.rol
-    },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: process.env.JWT_EXPIRES_IN || '2h'
-    }
-  );
-};
-
-// Devuelve tipos de cuenta
-const getTiposCuenta = async (req, res) => {
-  res.status(200).json({
+// TIPOS DE CUENTA
+const getTiposCuenta = (req, res) => {
+  return res.status(200).json({
     ok: true,
     data: [
       { codigo: 'COMPRADOR', nombre: 'Comprador' },
@@ -31,100 +16,101 @@ const getTiposCuenta = async (req, res) => {
   });
 };
 
-// Registra comprador
+// REGISTRO COMPRADOR
 const registerComprador = async (req, res) => {
   try {
     const { nombre, email, password } = req.body;
 
+    // Validación: Verifica que se reciban todos los campos obligatorios
     if (!nombre || !email || !password) {
       return res.status(400).json({
         ok: false,
-        msg: 'nombre, email y password son obligatorios'
+        msg: 'Faltan datos'
       });
     }
 
-    const existingUser = await AuthModel.findUserByEmail(email);
+    // Consulta si el correo ya existe en la base de datos
+    const exists = await AuthModel.findUserByEmail(email);
 
-    if (existingUser) {
+    // Si el correo ya está registrado, retorna un error de conflicto
+    if (exists) {
       return res.status(409).json({
         ok: false,
-        msg: 'Ya existe un usuario registrado con ese correo'
+        msg: 'Correo ya registrado'
       });
     }
 
-    // Encriptar contraseña
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    // Encripta la contraseña usando bcrypt
+    const hash = await bcrypt.hash(password, 10);
 
-    // Crear comprador con contraseña encriptada
+    // Almacena el nuevo comprador con la contraseña encriptada
     const data = await AuthModel.createComprador({
       nombre,
       email,
-      password: passwordHash
+      password: hash
     });
 
     return res.status(201).json({
       ok: true,
-      msg: 'Comprador registrado correctamente',
+      msg: 'Usuario creado',
       data
     });
+
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      msg: error.message
-    });
+    console.log(error);
+    return res.status(500).json({ ok: false, msg: error.message });
   }
 };
 
-// Registra tienda
+// REGISTRO TIENDA
 const registerTienda = async (req, res) => {
   try {
     const { nombre, email, telefono, direccion, horario, password } = req.body;
 
+    // Validación: Verifica que el comercio envíe todos sus datos obligatorios
     if (!nombre || !email || !telefono || !direccion || !horario || !password) {
       return res.status(400).json({
         ok: false,
-        msg: 'nombre, email, telefono, direccion, horario y password son obligatorios'
+        msg: 'Faltan datos'
       });
     }
 
-    const existingUser = await AuthModel.findUserByEmail(email);
+    // Consulta si el correo comercial ya existe
+    const exists = await AuthModel.findUserByEmail(email);
 
-    if (existingUser) {
+    if (exists) {
       return res.status(409).json({
         ok: false,
-        msg: 'Ya existe un usuario registrado con ese correo'
+        msg: 'Correo ya registrado'
       });
     }
 
-    // Encriptar contraseña
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    // Encripta la contraseña de la tienda
+    const hash = await bcrypt.hash(password, 10);
 
-    // Crear tienda con contraseña encriptada
+    // Crea el registro de la tienda en la base de datos
     const data = await AuthModel.createTienda({
       nombre,
       email,
       telefono,
       direccion,
       horario,
-      password: passwordHash
+      password: hash
     });
 
     return res.status(201).json({
       ok: true,
-      msg: 'Tienda registrada correctamente',
+      msg: 'Tienda creada',
       data
     });
+
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      msg: error.message
-    });
+    console.log(error);
+    return res.status(500).json({ ok: false, msg: error.message });
   }
 };
 
-// Login comprador
+// LOGIN COMPRADOR
 const loginComprador = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -132,54 +118,63 @@ const loginComprador = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         ok: false,
-        msg: 'email y password son obligatorios'
+        msg: 'Faltan datos'
       });
     }
 
-    // Buscar usuario por email
-    const usuario = await AuthModel.findUserByEmail(email);
+    // Busca al usuario por su correo electrónico
+    const user = await AuthModel.findUserByEmail(email);
 
-    if (!usuario || usuario.rol !== 'COMPRADOR') {
+    // Valida la existencia del usuario y que corresponda al rol de COMPRADOR
+    if (!user || user.rol !== 'COMPRADOR') {
       return res.status(401).json({
         ok: false,
-        msg: 'Correo o contraseña incorrectos'
+        msg: 'Credenciales incorrectas'
       });
     }
 
-    // Comparar contraseña
-    const passwordValida = await bcrypt.compare(password, usuario.password);
+    // Compara la contraseña ingresada con la contraseña encriptada
+    const match = await bcrypt.compare(password, user.password);
 
-    if (!passwordValida) {
+    if (!match) {
       return res.status(401).json({
         ok: false,
-        msg: 'Correo o contraseña incorrectos'
+        msg: 'Credenciales incorrectas'
       });
     }
 
-    // Generar token
-    const token = generarToken(usuario);
+    // Genera el token JWT guardando el ID, email y rol
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.rol
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
 
+    // Retorna la respuesta exitosa incluyendo la foto de perfil para el frontend
     return res.status(200).json({
       ok: true,
-      msg: 'Inicio de sesión exitoso',
+      msg: 'Login exitoso',
       token,
       data: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        direccion: usuario.direccion,
-        rol: usuario.rol
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+        foto_perfil: user.foto_perfil 
       }
     });
+
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      msg: error.message
-    });
+    console.log(error);
+    return res.status(500).json({ ok: false, msg: error.message });
   }
 };
 
-// Login tienda
+// LOGIN TIENDA
 const loginTienda = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -187,149 +182,63 @@ const loginTienda = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         ok: false,
-        msg: 'email y password son obligatorios'
+        msg: 'Faltan datos'
       });
     }
 
-    // Buscar usuario por email
-    const usuario = await AuthModel.findUserByEmail(email);
-
-    if (!usuario || usuario.rol !== 'TIENDA') {
-      return res.status(401).json({
-        ok: false,
-        msg: 'Correo o contraseña incorrectos'
-      });
-    }
-
-    // Comparar contraseña
-    const passwordValida = await bcrypt.compare(password, usuario.password);
-
-    if (!passwordValida) {
-      return res.status(401).json({
-        ok: false,
-        msg: 'Correo o contraseña incorrectos'
-      });
-    }
-
-    // Generar token
-    const token = generarToken(usuario);
-
-    return res.status(200).json({
-      ok: true,
-      msg: 'Inicio de sesión exitoso',
-      token,
-      data: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        rol: usuario.rol,
-        tienda: {
-          id: usuario.tienda_id,
-          nombre_tienda: usuario.nombre_tienda,
-          telefono: usuario.telefono,
-          horario: usuario.horario,
-          logo_url: usuario.logo_url
-        }
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      msg: error.message
-    });
-  }
-};
-
-// Recuperar contraseña
-const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        ok: false,
-        msg: 'El email es obligatorio'
-      });
-    }
-
+    // Busca el usuario de la tienda por su correo electrónico
     const user = await AuthModel.findUserByEmail(email);
 
-    if (!user) {
-      return res.status(404).json({
+    // Valida la existencia del usuario y que corresponda al rol de TIENDA
+    if (!user || user.rol !== 'TIENDA') {
+      return res.status(401).json({
         ok: false,
-        msg: 'No existe un usuario con ese correo'
+        msg: 'Credenciales incorrectas'
       });
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    // Compara la contraseña de la tienda con la almacenada en la base de datos
+    const match = await bcrypt.compare(password, user.password);
 
-    await AuthModel.saveRecoveryCode(user.id, code, expiresAt);
+    if (!match) {
+      return res.status(401).json({
+        ok: false,
+        msg: 'Credenciales incorrectas'
+      });
+    }
 
+    // Genera el token JWT firmado para la tienda
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        rol: user.rol
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    // Retorna los datos de autenticación de la tienda junto con su foto de perfil
     return res.status(200).json({
       ok: true,
-      msg: 'Código generado correctamente. En una versión real se enviaría al correo.',
+      msg: 'Login exitoso',
+      token,
       data: {
-        email,
-        codigo: code,
-        expira_en: expiresAt
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+        foto_perfil: user.foto_perfil 
       }
     });
+
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      msg: error.message
-    });
+    console.log(error);
+    return res.status(500).json({ ok: false, msg: error.message });
   }
 };
 
-// Restablecer contraseña
-const resetPassword = async (req, res) => {
-  try {
-    const { email, codigo, nuevaPassword } = req.body;
-
-    if (!email || !codigo || !nuevaPassword) {
-      return res.status(400).json({
-        ok: false,
-        msg: 'email, codigo y nuevaPassword son obligatorios'
-      });
-    }
-
-    const user = await AuthModel.findUserByEmailAndCode(email, codigo);
-
-    if (!user) {
-      return res.status(400).json({
-        ok: false,
-        msg: 'Código inválido'
-      });
-    }
-
-    if (!user.codigo_expira_en || new Date(user.codigo_expira_en) < new Date()) {
-      return res.status(400).json({
-        ok: false,
-        msg: 'El código ya expiró'
-      });
-    }
-
-    // Encriptar nueva contraseña
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(nuevaPassword, salt);
-
-    await AuthModel.updatePassword(user.id, passwordHash);
-
-    return res.status(200).json({
-      ok: true,
-      msg: 'Contraseña actualizada correctamente'
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      msg: error.message
-    });
-  }
-};
-
-// Cerrar sesión
+// LOGOUT
 const logout = (req, res) => {
   return res.status(200).json({
     ok: true,
@@ -337,7 +246,57 @@ const logout = (req, res) => {
   });
 };
 
-// Exporta controladores
+// PASSWORD RESET (básico)
+const forgotPassword = (req, res) => {
+  return res.status(200).json({
+    ok: true,
+    msg: 'Función no implementada aún'
+  });
+};
+
+const resetPassword = (req, res) => {
+  return res.status(200).json({
+    ok: true,
+    msg: 'Función no implementada aún'
+  });
+};
+
+// NUEVO: CONTROLADOR PARA CAMBIAR PASSWORD
+const cambiarPassword = async (req, res) => {
+  try {
+    // Recupera el ID del usuario desde el objeto req que inyecta el middleware de validación del token
+    const usuarioId = req.usuario.id;
+    const { passwordActual, passwordNuevo } = req.body;
+
+    // Obtiene la contraseña encriptada actual consultando por ID
+    const user = await UsuarioModel.getPasswordById(usuarioId);
+    if (!user) {
+      return res.status(404).json({ ok: false, msg: 'Usuario no encontrado' });
+    }
+
+    // Verifica si la contraseña actual ingresada coincide con la de la base de datos
+    const validPassword = await bcrypt.compare(passwordActual, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ ok: false, msg: 'La contraseña actual es incorrecta' });
+    }
+
+    // Encripta la nueva contraseña elegida
+    const hash = await bcrypt.hash(passwordNuevo, 10);
+    
+    // Actualiza la contraseña encriptada en el modelo de usuario
+    await UsuarioModel.updatePassword(usuarioId, hash);
+
+    return res.status(200).json({
+      ok: true,
+      msg: 'Contraseña cambiada con éxito'
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ ok: false, msg: error.message });
+  }
+};
+
+// EXPORTACIÓN
 module.exports = {
   getTiposCuenta,
   registerComprador,
@@ -346,5 +305,6 @@ module.exports = {
   loginTienda,
   forgotPassword,
   resetPassword,
-  logout
+  logout,
+  cambiarPassword
 };

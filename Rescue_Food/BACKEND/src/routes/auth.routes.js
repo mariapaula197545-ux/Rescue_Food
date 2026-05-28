@@ -1,29 +1,32 @@
-// Importa express
-const express = require('express');
+// src/routes/auth.routes.js
 
-// Importa controlador auth
+const express = require('express');
+const router = express.Router(); // Inicializa el enrutador de Express para agrupar los endpoints de autenticación
+
 const ctrl = require('../controllers/auth.controller');
 
-// Crea router
-const router = express.Router();
+// IMPORTAMOS TU MIDDLEWARE REAL
+const { verificarToken } = require('../middlewares/auth.middlewares'); 
 
-// Obtener tipos de cuenta
+// TIPOS DE CUENTA
 router.get('/tipos-cuenta', ctrl.getTiposCuenta);
 
-// Registro de usuarios
-router.post('/register/comprador', ctrl.registerComprador); // crear comprador
-router.post('/register/tienda', ctrl.registerTienda); // crear tienda
+// REGISTRO
+router.post('/register/comprador', ctrl.registerComprador);
+router.post('/register/tienda', ctrl.registerTienda); // Define rutas POST porque el cliente envía credenciales sensibles en el cuerpo (body)
 
-// Login
-router.post('/login/comprador', ctrl.loginComprador); // login comprador
-router.post('/login/tienda', ctrl.loginTienda); // login tienda
+// LOGIN
+router.post('/login/comprador', ctrl.loginComprador);
+router.post('/login/tienda', ctrl.loginTienda);
 
-// Recuperación de contraseña
-router.post('/forgot-password', ctrl.forgotPassword); // generar código
-router.post('/reset-password', ctrl.resetPassword); // cambiar contraseña
+// RECUPERACIÓN
+router.post('/forgot-password', ctrl.forgotPassword);
+router.post('/reset-password', ctrl.resetPassword);
 
-// Logout
-router.post('/logout', ctrl.logout); // cerrar sesión
+// LOGOUT
+router.post('/logout', ctrl.logout);
 
-// Exporta rutas
+// NUEVA RUTA PROTEGIDA DE SEGURIDAD (Usando tu verificarToken)
+router.put('/cambiar-password', verificarToken, ctrl.cambiarPassword); // Inyecta verificarToken como filtro obligatorio antes de ejecutar la actualización
+
 module.exports = router;

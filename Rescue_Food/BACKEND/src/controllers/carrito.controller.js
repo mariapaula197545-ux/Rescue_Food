@@ -7,6 +7,7 @@ const getCart = async (req, res) => {
     const { usuarioId } = req.params; // id usuario
     const data = await CarritoModel.getCartByUsuarioId(usuarioId); // consulta DB
 
+    // Responde con éxito enviando los datos del carrito recuperados
     return res.status(200).json({
       ok: true,
       data
@@ -22,6 +23,7 @@ const addItem = async (req, res) => {
     const { usuarioId } = req.params; // id usuario
     const { producto_id, cantidad } = req.body; // datos body
 
+    // Validación: Verifica que se reciba el identificador del producto
     if (!producto_id) {
       return res.status(400).json({
         ok: false,
@@ -29,7 +31,10 @@ const addItem = async (req, res) => {
       });
     }
 
+    // Evalúa la cantidad recibida o asigna 1 por defecto usando cortocircuito
     const cantidadFinal = Number(cantidad || 1); // cantidad default 1
+    
+    // Validación: Evita que se inyecten cantidades negativas o iguales a cero
     if (cantidadFinal <= 0) {
       return res.status(400).json({
         ok: false,
@@ -38,6 +43,8 @@ const addItem = async (req, res) => {
     }
 
     const producto = await CarritoModel.getProductoById(producto_id); // busca producto
+    
+    // Validación: Verifica la existencia física del producto en la base de datos
     if (!producto) {
       return res.status(404).json({
         ok: false,
@@ -45,6 +52,7 @@ const addItem = async (req, res) => {
       });
     }
 
+    // Validación: Revisa el estado de disponibilidad comercial del producto
     if (!Number(producto.disponible)) {
       return res.status(400).json({
         ok: false,
@@ -70,6 +78,7 @@ const updateItem = async (req, res) => {
     const { usuarioId, productoId } = req.params; // ids
     const { cantidad } = req.body; // nueva cantidad
 
+    // Conversión de tipo y validación matemática de la nueva cantidad
     const cantidadFinal = Number(cantidad);
     if (!cantidadFinal || cantidadFinal <= 0) {
       return res.status(400).json({
@@ -80,6 +89,7 @@ const updateItem = async (req, res) => {
 
     const affected = await CarritoModel.updateItem(usuarioId, productoId, cantidadFinal); // update DB
 
+    // Validación: Comprueba si se modificó alguna fila en la base de datos
     if (!affected) {
       return res.status(404).json({
         ok: false,
@@ -106,6 +116,7 @@ const removeItem = async (req, res) => {
 
     const affected = await CarritoModel.removeItem(usuarioId, productoId); // delete DB
 
+    // Validación: Si no hubo filas afectadas, el producto no estaba en el carrito
     if (!affected) {
       return res.status(404).json({
         ok: false,

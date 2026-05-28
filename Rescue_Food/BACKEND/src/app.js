@@ -1,61 +1,50 @@
+// app.js
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
-const morgan = require('morgan'); // ✅ agregar
+
+const productosRoutes = require('./routes/productos.routes');
+const authRoutes = require('./routes/auth.routes');
+const usuariosRoutes = require('./routes/usuarios.routes');
+
+// 1. IMPORTAR LAS RUTAS DE LA TIENDA (AQUÍ LO AGREGAMOS)
+const tiendasRoutes = require('./routes/tiendas.routes'); 
 
 const app = express();
 
-// Rutas
-const authRoutes = require('./routes/auth.routes');
-const usuariosRoutes = require('./routes/usuarios.routes');
-const tiendasRoutes = require('./routes/tiendas.routes');
-const categoriasRoutes = require('./routes/categorias.routes');
-const productosRoutes = require('./routes/productos.routes');
-const carritoRoutes = require('./routes/carrito.routes');
-const pedidosRoutes = require('./routes/pedidos.routes');
-const pagosRoutes = require('./routes/pagos.routes');
-const tiendasPublicRoutes = require('./routes/tiendas.public.routes');
-const adminRoutes = require('./routes/admin.routes');
+// MIDDLEWARES
+app.use(cors()); // Permite que el backend reciba peticiones seguras desde servidores externos o el localhost del Frontend
+app.use(express.json()); // Middleware para que el servidor entienda y parsee los datos enviados en formato JSON dentro del body
 
-// Middlewares
-app.use(cors());
-app.use(morgan('dev')); // ✅ logging como en la guía
-app.use(express.json());
+// CARPETA IMAGENES
+app.use(
+  '/uploads',
+  express.static(path.join(process.cwd(), 'uploads'))
+); // Hace que la carpeta 'uploads' sea pública y accesible mediante URL en el navegador para servir fotos y logos
 
-// Middleware personalizado (como te enseñaron)
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
+// RUTAS AUTH
+app.use(
+  '/api/auth',
+  authRoutes
+);
 
-// Health
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, msg: 'API activa' });
-});
+// RUTAS PRODUCTOS
+app.use(
+  '/api/productos',
+  productosRoutes
+);
 
-// Rutas
-app.use('/api/auth', authRoutes);
-app.use('/api/usuarios', usuariosRoutes);
-app.use('/api/tiendas', tiendasRoutes);
-app.use('/api/categorias', categoriasRoutes);
-app.use('/api/productos', productosRoutes);
-app.use('/api/carrito', carritoRoutes);
-app.use('/api/pedidos', pedidosRoutes);
-app.use('/api/pagos', pagosRoutes);
-app.use('/api/tiendas-public', tiendasPublicRoutes);
-app.use('/api/admin', adminRoutes);
+// RUTAS USUARIOS
+app.use(
+  '/api/usuarios',
+  usuariosRoutes
+);
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({ ok: false, msg: 'Ruta no encontrada' });
-});
+// RUTAS TIENDAS (AQUÍ REGISTRAMOS EL PREFIJO PARA TU FRONTEND)
+app.use(
+  '/api/tiendas',
+  tiendasRoutes
+); // Enlaza el enrutador de tiendas asignándole un prefijo de ruta limpio para la API REST
 
-// ✅ Middleware de errores global (FALTABA)
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({
-    ok: false,
-    msg: 'Error interno del servidor'
-  });
-});
-
-module.exports = app;
+// EXPORTAR APP
+module.exports = app; // Exporta la instancia configurada de Express para que el archivo del servidor de entrada (como server.js o index.js) la ponga a escuchar

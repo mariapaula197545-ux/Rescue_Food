@@ -8,12 +8,12 @@ const ensureCart = async (usuarioId) => {
     [usuarioId]
   );
 
-  if (rows[0]) return rows[0]; // ya existe
+  if (rows[0]) return rows[0]; // Retorna el carrito si ya existe en la base de datos
 
   const [result] = await pool.query(
     'INSERT INTO carritos (usuario_id) VALUES (?)',
     [usuarioId]
-  );
+  ); // Crea un registro de carrito vacío en la tabla si es la primera vez del usuario
 
   return { id: result.insertId, usuario_id: Number(usuarioId) }; // nuevo carrito
 };
@@ -28,9 +28,9 @@ const getCartByUsuarioId = async (usuarioId) => {
     FROM carrito_items ci
     INNER JOIN productos p ON p.id = ci.producto_id
     WHERE ci.carrito_id = ?
-  `, [cart.id]); // trae items
+  `, [cart.id]); // Cruza los ítems con productos para calcular dinámicamente el subtotal en SQL
 
-  const total = items.reduce((acc, i) => acc + Number(i.subtotal), 0); // total
+  const total = items.reduce((acc, i) => acc + Number(i.subtotal), 0); // Suma los subtotales de todos los ítems para obtener el costo total
 
   return { carrito: cart, items, total };
 };
@@ -61,7 +61,7 @@ const addItem = async (usuarioId, productoId, cantidad) => {
     INSERT INTO carrito_items (carrito_id, producto_id, cantidad)
     VALUES (?, ?, ?)
     ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad)
-  `, [cart.id, productoId, cantidad]);
+  `, [cart.id, productoId, cantidad]); // Si el producto ya está en el carrito, suma la nueva cantidad a la anterior
 
   return getCartByUsuarioId(usuarioId); // carrito actualizado
 };
@@ -75,7 +75,7 @@ const updateItem = async (usuarioId, productoId, cantidad) => {
     [cantidad, cart.id, productoId]
   );
 
-  return result.affectedRows;
+  return result.affectedRows; // Retorna la cantidad de filas modificadas para verificar el éxito en el controlador
 };
 
 // Eliminar producto
@@ -87,7 +87,7 @@ const removeItem = async (usuarioId, productoId) => {
     [cart.id, productoId]
   );
 
-  return result.affectedRows;
+  return result.affectedRows; // Retorna si se eliminó físicamente el producto del carrito
 };
 
 // Vaciar carrito
@@ -97,7 +97,7 @@ const clearCart = async (usuarioId) => {
   await pool.query(
     'DELETE FROM carrito_items WHERE carrito_id = ?',
     [cart.id]
-  );
+  ); // Remueve todos los productos enlazados a este carrito de una sola vez
 
   return true;
 };

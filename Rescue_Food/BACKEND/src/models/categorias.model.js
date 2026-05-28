@@ -7,7 +7,8 @@ const getAll = async () => {
     `SELECT id, nombre, descripcion, creada_en
      FROM categorias
      ORDER BY nombre ASC`
-  ); // consulta DB ordenada
+  ); // Trae los campos específicos de la tabla organizados alfabéticamente (ASC)
+
   return rows; // devuelve lista
 };
 
@@ -18,9 +19,9 @@ const getById = async (id) => {
      FROM categorias
      WHERE id = ?`,
     [id]
-  ); // busca por id
+  ); // Usa marcadores de posición (?) para prevenir inyecciones SQL maliciosas
 
-  return rows[0]; // devuelve una
+  return rows[0]; // Retorna únicamente el objeto del registro encontrado
 };
 
 // Exporta funciones

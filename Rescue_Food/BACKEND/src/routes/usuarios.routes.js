@@ -1,17 +1,27 @@
-// Importa express
+// src/routes/usuarios.routes.js
+
 const express = require('express');
 
-// Importa controlador usuarios
-const controller = require('../controllers/usuarios.controller');
+const controller =
+  require('../controllers/usuarios.controller');
 
-// Crea router
+const upload =
+  require('../middlewares/uploadPerfil');
+
 const router = express.Router();
 
-// Obtener usuario por ID
+// =====================================
+// OBTENER USUARIO
+// =====================================
 router.get('/:id', controller.getById);
 
-// Actualizar usuario
-router.put('/:id', controller.updateById);
+// =====================================
+// ACTUALIZAR USUARIO
+// =====================================
+router.put(
+  '/:id',
+  upload.single('foto'),
+  controller.updateById
+);
 
-// Exporta rutas
 module.exports = router;

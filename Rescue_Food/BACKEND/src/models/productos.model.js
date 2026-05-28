@@ -1,7 +1,7 @@
 // Importa conexión DB
 const { pool } = require('../config/db');
 
-// Listar productos con filtros
+// LISTAR PRODUCTOS CON FILTROS
 const getAll = async ({ categoriaId, tiendaId, disponible, search }) => {
   let sql = `
     SELECT
@@ -12,6 +12,7 @@ const getAll = async ({ categoriaId, tiendaId, disponible, search }) => {
       p.stock,
       p.imagen_url,
       p.disponible,
+      p.vence_en,
       p.creado_en,
       p.actualizado_en,
       c.id AS categoria_id,
@@ -22,37 +23,37 @@ const getAll = async ({ categoriaId, tiendaId, disponible, search }) => {
     INNER JOIN categorias c ON c.id = p.categoria_id
     INNER JOIN tiendas t ON t.id = p.tienda_id
     WHERE 1 = 1
-  `; // base consulta
+  `; // Construye la consulta base uniendo productos con sus categorías y tiendas respectivas
 
-  const params = []; // parámetros SQL
+  const params = []; // Arreglo dinámico para almacenar los valores de los filtros aplicados
 
   if (categoriaId) {
-    sql += ' AND p.categoria_id = ?'; // filtra categoría
+    sql += ' AND p.categoria_id = ?'; // Añade filtro por categoría si se recibe en los parámetros
     params.push(categoriaId);
   }
 
   if (tiendaId) {
-    sql += ' AND p.tienda_id = ?'; // filtra tienda
+    sql += ' AND p.tienda_id = ?'; // Añade filtro para mostrar solo los productos de un comercio específico
     params.push(tiendaId);
   }
 
   if (disponible !== undefined && disponible !== '') {
-    sql += ' AND p.disponible = ?'; // filtra disponibilidad
+    sql += ' AND p.disponible = ?'; // Valida la disponibilidad convirtiendo el valor a número (0 o 1)
     params.push(Number(disponible));
   }
 
   if (search) {
-    sql += ' AND (p.nombre LIKE ? OR p.descripcion LIKE ?)'; // búsqueda
+    sql += ' AND (p.nombre LIKE ? OR p.descripcion LIKE ?)'; // Permite buscar coincidencias parciales por texto
     params.push(`%${search}%`, `%${search}%`);
   }
 
-  sql += ' ORDER BY p.id DESC'; // ordena
+  sql += ' ORDER BY p.id DESC'; // Organiza el catálogo dinámico mostrando primero los últimos productos agregados
 
-  const [rows] = await pool.query(sql, params); // ejecuta consulta
+  const [rows] = await pool.query(sql, params); // Ejecuta la consulta estructurada con su lista final de parámetros
   return rows; // devuelve lista
 };
 
-// Obtener producto por ID
+// OBTENER PRODUCTO POR ID
 const getById = async (id) => {
   const [rows] = await pool.query(
     `
@@ -64,6 +65,7 @@ const getById = async (id) => {
       p.stock,
       p.imagen_url,
       p.disponible,
+      p.vence_en,
       p.creado_en,
       p.actualizado_en,
       c.id AS categoria_id,
@@ -77,12 +79,12 @@ const getById = async (id) => {
     WHERE p.id = ?
     `,
     [id]
-  ); // busca producto
+  ); // Obtiene la ficha técnica de un único producto cruzando los datos del comercio dueño
 
   return rows[0]; // devuelve uno
 };
 
-// Productos de la tienda del usuario
+// PRODUCTOS DE LA TIENDA DEL USUARIO
 const getByUsuarioTienda = async (usuarioId) => {
   const [rows] = await pool.query(
     `
@@ -94,6 +96,7 @@ const getByUsuarioTienda = async (usuarioId) => {
       p.stock,
       p.imagen_url,
       p.disponible,
+      p.vence_en,
       p.creado_en,
       p.actualizado_en,
       c.id AS categoria_id,
@@ -107,24 +110,23 @@ const getByUsuarioTienda = async (usuarioId) => {
     ORDER BY p.id DESC
     `,
     [usuarioId]
-  ); // productos por usuario
+  ); // Filtra el catálogo usando el ID del usuario administrador asociado a la tienda
 
   return rows;
 };
 
-// Obtener tienda por usuario
+// OBTENER TIENDA POR USUARIO
 const getTiendaIdByUsuarioId = async (usuarioId) => {
   const [rows] = await pool.query(
     `SELECT id, usuario_id, nombre_tienda
      FROM tiendas
      WHERE usuario_id = ?`,
     [usuarioId]
-  ); // busca tienda
-
+  ); // Retorna los datos mínimos del local del usuario para gestionar sus productos
   return rows[0];
 };
 
-// Crear producto
+// CREAR PRODUCTO
 const create = async ({
   tienda_id,
   categoria_id,
@@ -133,13 +135,14 @@ const create = async ({
   precio,
   stock,
   imagen_url,
-  disponible
+  disponible,
+  vence_en
 }) => {
   const [result] = await pool.query(
     `
     INSERT INTO productos
-      (tienda_id, categoria_id, nombre, descripcion, precio, stock, imagen_url, disponible)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (tienda_id, categoria_id, nombre, descripcion, precio, stock, imagen_url, disponible, vence_en)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       tienda_id,
@@ -149,17 +152,18 @@ const create = async ({
       precio,
       stock ?? 0,
       imagen_url ?? null,
-      disponible ?? 1
+      disponible ?? 1,
+      vence_en ?? 1 // Asigna un valor de respaldo por defecto si el campo llega vacío
     ]
-  ); // inserta producto
+  ); // Inserta el nuevo registro usando el operador de fusión nula (??) para controlar opcionales
 
   return result.insertId; // id creado
 };
 
-// Actualizar producto
+// ACTUALIZAR PRODUCTO
 const update = async (
   id,
-  { categoria_id, nombre, descripcion, precio, stock, imagen_url, disponible }
+  { categoria_id, nombre, descripcion, precio, stock, imagen_url, disponible, vence_en }
 ) => {
   const [result] = await pool.query(
     `
@@ -170,7 +174,8 @@ const update = async (
         precio = COALESCE(?, precio),
         stock = COALESCE(?, stock),
         imagen_url = COALESCE(?, imagen_url),
-        disponible = COALESCE(?, disponible)
+        disponible = COALESCE(?, disponible),
+        vence_en = COALESCE(?, vence_en)
     WHERE id = ?
     `,
     [
@@ -181,20 +186,20 @@ const update = async (
       stock ?? null,
       imagen_url ?? null,
       disponible ?? null,
+      vence_en ?? null,
       id
     ]
-  ); // update parcial
+  ); // Aplica COALESCE en SQL para mantener el valor existente si el parámetro llega como NULL
 
   return result.affectedRows; // filas afectadas
 };
 
-// Eliminar producto
+// ELIMINAR PRODUCTO
 const remove = async (id) => {
   const [result] = await pool.query(
     `DELETE FROM productos WHERE id = ?`,
     [id]
-  ); // delete producto
-
+  ); // Ejecuta el borrado físico del registro seleccionado por su clave primaria
   return result.affectedRows;
 };
 
